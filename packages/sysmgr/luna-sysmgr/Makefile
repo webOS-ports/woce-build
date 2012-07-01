@@ -40,39 +40,35 @@ QMAKE := $(QTPATH)/bin/qmake-palm
 
 .PHONY: build unpack patch package
 package:: ipkgs/${APP_ID}_${VERSION}_armv7.ipk
-build:: build/armv7-stage/.built-${VERSION}
-unpack: build/src/.unpacked
+build:: build/$(CONFIG)/armv7-stage/.built-${VERSION}
+unpack: build/$(CONFIG)/.unpacked
 
-LUNASYSMGR_NAME := LunaSysMgr
-LUNASYSMGR_TAG := initial
-LUNASYSMGR_URL := https://github.com/woce/$(LUNASYSMGR_NAME)/tarball/$(LUNASYSMGR_TAG)
-LUNASYSMGR_DL := $(DL_DIR)/$(LUNASYSMGR_NAME)-$(LUNASYSMGR_TAG).tar.gz
-
-# Create rule for grabbing this version
-$(eval $(call DLTGZ,$(LUNASYSMGR_NAME),$(LUNASYSMGR_TAG),$(LUNASYSMGR_URL)))
+$(call DL,LUNASYSMGR)
 
 ### Unpack the software and build it
-build/src/.unpacked: sysmgr.patch $(LUNASYSMGR_DL)
-	-rm -rf build
-	mkdir -p build/src
-	tar -C build/src --strip=1 -zxf $(LUNASYSMGR_DL)
-	patch -Np2 -d build/src < sysmgr.patch
+build/$(CONFIG)/.unpacked: sysmgr.patch $(LUNASYSMGR_DL)
+	-rm -rf build/$(CONFIG)
+	mkdir -p build/$(CONFIG)/src
+	$(call EXTRACT,LUNASYSMGR,build/$(CONFIG)/src,--strip=1)
+	patch -Np2 -d build/$(CONFIG)/src < sysmgr.patch
 	touch $@
 
-build/armv7-stage/.built-${VERSION}: build/src/.unpacked
-	-rm -rf build/armv7-stage
-	mkdir -p build/armv7-stage
-	cd build/armv7-stage && \
+build/$(CONFIG)/armv7-stage/.config-${VERSION}: build/$(CONFIG)/.unpacked
+	-rm -rf build/$(CONFIG)/armv7-stage
+	mkdir -p build/$(CONFIG)/armv7-stage
+	cd build/$(CONFIG)/armv7-stage && \
 		$(CCENV) \
 		PATH=$(QTPATH)/bin:$$PATH \
 		$(QMAKE) ../src \
 		-spec qws/linux-armv6-g++
-	$(CCENV) $(MAKE) -C build/armv7-stage
 	touch $@
 
+build/$(CONFIG)/armv7-stage/.built-${VERSION}: build/$(CONFIG)/armv7-stage/.config-${VERSION}
+	$(CCENV) $(MAKE) -C build/$(CONFIG)/armv7-stage
+
 ### Packaging magic
-build/.built-${VERSION}: build/armv7.built-${VERSION}
-	touch $@
+## TODO: When we revisit packaging, fix this up to do the 'right' thing regarding CONFIG
+build/.built-${VERSION}: build/$(CONFIG)/armv7.built-${VERSION}
 
 ### Headless app packaging fun
 build/%.built-${VERSION}: build/%-stage/.built-${VERSION} ${DL_DIR}/headlessapp-${HEADLESSAPP_VERSION}.tar.gz
